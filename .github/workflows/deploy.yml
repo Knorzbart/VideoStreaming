@@ -39,6 +39,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            cd /root/video-streaming
             docker pull knorz/video-streaming-frontend:latest
             docker pull knorz/video-streaming-backend:latest
-            docker-compose -f /root/video-streaming/docker-compose.yml up -d
+            docker-compose up -d
