@@ -1,0 +1,44 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push frontend
+        run: |
+          docker build -t knorz/video-streaming-frontend:latest ./frontend
+          docker push knorz/video-streaming-frontend:latest
+
+      - name: Build and push backend
+        run: |
+          docker build -t knorz/video-streaming-backend:latest ./backend
+          docker push knorz/video-streaming-backend:latest
+
+      - name: SSH into server and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull knorz/video-streaming-frontend:latest
+            docker pull knorz/video-streaming-backend:latest
+            docker-compose -f /root/video-streaming/docker-compose.yml up -d
