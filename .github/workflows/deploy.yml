@@ -39,6 +39,15 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            sudo systemctl stop apache2 || true
+            sudo systemctl stop nginx || true
+            sudo systemctl stop mongod || true
+            sudo lsof -t -i tcp:80 -s tcp:listen | xargs --no-run-if-empty sudo kill -9 || true
+            sudo lsof -t -i tcp:27017 -s tcp:listen | xargs --no-run-if-empty sudo kill -9 || true
+            docker stop $(docker ps -q) || true
+            docker rm $(docker ps -a -q) || true
+            docker rmi $(docker images -q) || true
+            docker volume prune -f || true
             cd /root/video-streaming
             docker pull knorz/video-streaming-frontend:latest
             docker pull knorz/video-streaming-backend:latest
