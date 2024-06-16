@@ -32,6 +32,24 @@ jobs:
           docker build -t knorz/video-streaming-backend:latest ./backend
           docker push knorz/video-streaming-backend:latest
 
+      - name: Copy docker-compose.yml to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "./docker-compose.yml"
+          target: "/root/video-streaming/docker-compose.yml"
+
+      - name: Copy nginx.conf to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "./nginx.conf"
+          target: "/root/video-streaming/nginx.conf"
+
       - name: SSH into server and deploy
         uses: appleboy/ssh-action@master
         with:
@@ -39,9 +57,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            sudo systemctl stop apache2 || true
-            sudo systemctl stop nginx || true
-            sudo systemctl stop mongod || true
             sudo lsof -t -i tcp:80 -s tcp:listen | xargs --no-run-if-empty sudo kill -9 || true
             sudo lsof -t -i tcp:27017 -s tcp:listen | xargs --no-run-if-empty sudo kill -9 || true
             docker stop $(docker ps -q) || true
@@ -49,6 +64,6 @@ jobs:
             docker rmi $(docker images -q) || true
             docker volume prune -f || true
             cd /root/video-streaming
-            docker pull knorz/video-streaming-frontend:latest
-            docker pull knorz/video-streaming-backend:latest
+            docker-compose down
+            docker-compose pull
             docker-compose up -d

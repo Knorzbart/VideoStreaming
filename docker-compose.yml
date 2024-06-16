@@ -1,69 +1,38 @@
-name: CI/CD Pipeline
+version: '3.8'
 
-on:
-  push:
-    branches:
-      - master
+services:
+  frontend:
+    image: knorz/video-streaming-frontend:latest
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  backend:
+    image: knorz/video-streaming-backend:latest
+    expose:
+      - "5000"
+    depends_on:
+      - mongo
+    environment:
+      - FLASK_ENV=production
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push frontend
-        run: |
-          docker build -t knorz/video-streaming-frontend:latest ./frontend
-          docker push knorz/video-streaming-frontend:latest
-
-      - name: Build and push backend
-        run: |
-          docker build -t knorz/video-streaming-backend:latest ./backend
-          docker push knorz/video-streaming-backend:latest
-
-      - name: Copy docker-compose.yml to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "./docker-compose.yml"
-          target: "/root/video-streaming/docker-compose.yml"
-
-      - name: Copy nginx.conf to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "./nginx.conf"
-          target: "/root/video-streaming/nginx.conf"
-
-      - name: SSH into server and deploy
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            sudo lsof -t -i tcp:80 -s tcp:listen | xargs --no-run-if-empty sudo kill -9 || true
-            sudo lsof -t -i tcp:27017 -s tcp:listen | xargs --no-run-if-empty sudo kill -9 || true
-            docker stop $(docker ps -q) || true
-            docker rm $(docker ps -a -q) || true
-            docker rmi $(docker images -q) || true
-            docker volume prune -f || true
-            cd /root/video-streaming
-            docker-compose down
-            docker-compose pull
-            docker-compose up -d
+volumes:
+  mongo-data:
